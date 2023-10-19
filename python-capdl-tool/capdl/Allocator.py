@@ -86,7 +86,7 @@ class ObjectAllocator(object):
         self.counter += 1
         frame_type = [page for page in self.spec.arch.get_pages() if page == type]
         if type == ObjectType.seL4_UntypedObject:
-            size_bits = kwargs.get('size_bits', 12)
+            size_bits = kwargs.get('size_bits', 14)
             paddr = kwargs.get('paddr', None)
             assert(paddr != 0)
             o = Untyped(name, size_bits, paddr)
@@ -100,7 +100,7 @@ class ObjectAllocator(object):
             o = CNode(name, **kwargs)
         elif type == ObjectType.seL4_FrameObject:
             if 'size' not in kwargs:
-                kwargs['size'] = 4096
+                kwargs['size'] = 16384
             o = Frame(name, **kwargs)
         elif type == ObjectType.seL4_PageTableObject:
             o = PageTable(name)

@@ -24,6 +24,7 @@
 #include <sel4/sel4.h>
 #include <sel4utils/sel4_zf_logif.h>
 #include "capdl.h"
+#include "interfaces/sel4_client.h"
 
 #ifdef CONFIG_DEBUG_BUILD
 #include <utils/attribute.h>
@@ -39,6 +40,11 @@
 #ifdef CONFIG_ARCH_RISCV
 #define seL4_PageDirIndexBits seL4_PageTableIndexBits
 #define PT_LEVEL_SLOT(vaddr, level) (((vaddr) >> ((seL4_PageTableIndexBits * (level-1)) + seL4_PageBits)) & MASK(seL4_PageTableIndexBits))
+#endif
+
+#ifdef CONFIG_ARCH_LOONGARCH
+#define seL4_PageDirIndexBits seL4_PageTableIndexBits
+#define PT_LEVEL_SLOT(vaddr, level) (((vaddr) >> ((seL4_PageTableIndexBits * (level - 1)) + seL4_PageBits)) & MASK(seL4_PageTableIndexBits))
 #endif
 
 #define PML4_SLOT(vaddr) ((vaddr >> (seL4_PDPTIndexBits + seL4_PageDirIndexBits + seL4_PageTableIndexBits + seL4_PageBits)) & MASK(seL4_PML4IndexBits))
@@ -229,7 +235,7 @@ static CDL_Cap *get_cdl_frame_pd(CDL_ObjID root, uintptr_t vaddr, CDL_Model *spe
 }
 #endif
 
-#ifndef CONFIG_ARCH_RISCV
+#if !defined(CONFIG_ARCH_RISCV) && !defined(CONFIG_ARCH_LOONGARCH)
 static CDL_Cap *get_cdl_frame_pt(CDL_ObjID pd, uintptr_t vaddr, CDL_Model *spec)
 {
 #if defined(CONFIG_ARCH_X86_64) || defined(CONFIG_ARCH_AARCH64)
@@ -245,7 +251,7 @@ static CDL_Cap *get_cdl_frame_pt(CDL_ObjID pd, uintptr_t vaddr, CDL_Model *spec)
     return pt_cap;
 }
 
-#else /* CONFIG_ARCH_RISCV */
+#else /* CONFIG_ARCH_RISCV || CONFIG_ARCH_LOONGARCH */
 
 /**
  * Do a recursive traversal from the top to bottom of a page table structure to
@@ -350,7 +356,7 @@ void init_copy_frame(seL4_BootInfo *bootinfo)
     /* guess that there is one PDPT and PML4 on x86_64 or one PGD and PUD on aarch64 */
     copy_addr_pt += 2;
 #endif
-#ifdef CONFIG_ARCH_RISCV
+#if defined(CONFIG_ARCH_RISCV) || defined(CONFIG_ARCH_LOONGARCH)
     /* The base case assumes that there is 2 levels paging structure and already skips
      * the top level and level after that.  We then also need to skip the remaining levels */
     copy_addr_pt += CONFIG_PT_LEVELS - 2;
@@ -1007,7 +1013,7 @@ static void init_tcb(CDL_Model *spec, CDL_ObjID tcb)
     if (cdl_ipcbuffer == NULL) {
         ZF_LOGD("  Warning: TCB has no IPC buffer");
     }
-#if defined(CONFIG_ARM_HYPERVISOR_SUPPORT) || defined(CONFIG_VTX)
+#if defined(CONFIG_ARM_HYPERVISOR_SUPPORT) || defined(CONFIG_VTX) || defined(CONFIG_LOONGARCH_HYPERVISOR_SUPPORT)
     CDL_Cap *cdl_vcpu = get_cap_at(cdl_tcb, CDL_TCB_VCPU_SLOT);
 #endif
 
@@ -1024,7 +1030,7 @@ static void init_tcb(CDL_Model *spec, CDL_ObjID tcb)
     seL4_CPtr sel4_vspace_root = cdl_vspace_root ? orig_caps(CDL_Cap_ObjID(cdl_vspace_root)) : 0;
     seL4_CPtr sel4_ipcbuffer   = cdl_ipcbuffer ? orig_caps(CDL_Cap_ObjID(cdl_ipcbuffer)) : 0;
     seL4_CPtr UNUSED sel4_sc   = cdl_sc ? orig_caps(CDL_Cap_ObjID(cdl_sc)) : 0;
-#if defined(CONFIG_ARM_HYPERVISOR_SUPPORT) || defined(CONFIG_VTX)
+#if defined(CONFIG_ARM_HYPERVISOR_SUPPORT) || defined(CONFIG_VTX) || defined(CONFIG_LOONGARCH_HYPERVISOR_SUPPORT)
     seL4_CPtr sel4_vcpu        = cdl_vcpu ? orig_caps(CDL_Cap_ObjID(cdl_vcpu)) : 0;
 #endif
 
@@ -1139,12 +1145,14 @@ static void init_tcb(CDL_Model *spec, CDL_ObjID tcb)
 
     ZF_LOGF_IFERR(error, "");
 
-#if defined(CONFIG_ARM_HYPERVISOR_SUPPORT) || defined(CONFIG_VTX)
+#if defined(CONFIG_ARM_HYPERVISOR_SUPPORT) || defined(CONFIG_VTX) || defined(CONFIG_LOONGARCH_HYPERVISOR_SUPPORT)
     if (sel4_vcpu) {
 #ifdef CONFIG_ARM_HYPERVISOR_SUPPORT
         int error = seL4_ARM_VCPU_SetTCB(sel4_vcpu, sel4_tcb);
-#else //CONFIG_VTX
+#elif  defined(CONFIG_VTX)
         int error = seL4_X86_VCPU_SetTCB(sel4_vcpu, sel4_tcb);
+#else  /* CONFIG_ARCH_LOONGARCH */
+        int error = seL4_LOONGARCH_VCPU_SetTCB(sel4_vcpu, sel4_tcb);
 #endif
         ZF_LOGF_IFERR(error, "Failed to bind TCB %s to VCPU %s",
                       CDL_Obj_Name(cdl_tcb), CDL_Obj_Name(get_spec_object(spec, CDL_Cap_ObjID(cdl_vcpu))));
@@ -1191,6 +1199,9 @@ static void configure_tcb(CDL_Model *spec, CDL_ObjID tcb)
     reg_args = 4;
 #endif
 #if defined(CONFIG_ARCH_RISCV)
+    reg_args = 4;
+#endif
+#if defined(CONFIG_ARCH_LOONGARCH)
     reg_args = 4;
 #endif
 
@@ -1296,6 +1307,13 @@ static void configure_tcb(CDL_Model *spec, CDL_ObjID tcb)
         .rdx = argc > 2 ? argv[2] : 0,
         .rcx = argc > 3 ? argv[3] : 0,
 #elif defined(CONFIG_ARCH_RISCV)
+        .pc = pc,
+        .sp = sp,
+        .a0 = argc > 0 ? argv[0] : 0,
+        .a1 = argc > 1 ? argv[1] : 0,
+        .a2 = argc > 2 ? argv[2] : 0,
+        .a3 = argc > 3 ? argv[3] : 0,
+#elif defined(CONFIG_ARCH_LOONGARCH)
         .pc = pc,
         .sp = sp,
         .a0 = argc > 0 ? argv[0] : 0,
@@ -1521,7 +1539,7 @@ static void map_page(CDL_Model *spec UNUSED, CDL_Cap *page_cap, CDL_ObjID pd_id,
     }
 }
 
-#if defined(CONFIG_ARCH_X86_64) || defined(CONFIG_ARCH_AARCH64) || defined(CONFIG_ARCH_RISCV)
+#if defined(CONFIG_ARCH_X86_64) || defined(CONFIG_ARCH_AARCH64) || defined(CONFIG_ARCH_RISCV) || defined(CONFIG_ARCH_LOONGARCH)
 
 static void init_level_3(CDL_Model *spec, CDL_ObjID level_0_obj, uintptr_t level_3_base, CDL_ObjID level_3_obj)
 {
@@ -1670,7 +1688,7 @@ static void init_vspace(CDL_Model *spec)
 {
     ZF_LOGD("Initialising VSpaces...");
 
-#if defined(CONFIG_ARCH_X86_64) || defined(CONFIG_ARCH_AARCH64) || defined(CONFIG_ARCH_RISCV)
+#if defined(CONFIG_ARCH_X86_64) || defined(CONFIG_ARCH_AARCH64) || defined(CONFIG_ARCH_RISCV) || defined(CONFIG_ARCH_LOONGARCH)
     /* Have no understanding of the logic of model of whatever the hell the
        other code in this function is doing as it is pure gibberish. For
        x86_64 and aarch64 we will just do the obvious recursive initialization */
@@ -2031,9 +2049,9 @@ static void init_scs(CDL_Model *spec)
     }
 }
 
-#ifdef CONFIG_ARCH_RISCV
+#if defined(CONFIG_ARCH_RISCV) || defined(CONFIG_ARCH_LOONGARCH)
 /**
- * RISC-V uses a PageTable object as all table objects in the address structure.
+ * RISC-V/LoongArch uses a PageTable object as all table objects in the address structure.
  * in several places this loader assumes that the root VSpace object is a unique
  * object type and can be iterated over in the spec for performing operations on
  * a vspace_root. This function updates the CDL object type of all PageTables that
@@ -2071,7 +2089,7 @@ static void init_system(CDL_Model *spec)
     parse_bootinfo(bootinfo, spec);
 
     create_objects(spec, bootinfo);
-#ifdef CONFIG_ARCH_RISCV
+#if defined(CONFIG_ARCH_RISCV) || defined(CONFIG_ARCH_LOONGARCH)
     /*
      * This needs to be called after create_objects as it modifies parts of the
      * spec that create_objects uses, but are _hopefully_ safe to change after.

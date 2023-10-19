@@ -184,7 +184,7 @@ class ContainerObject(six.with_metaclass(abc.ABCMeta, Object)):
 
 
 class Frame(Object):
-    def __init__(self, name, size=4096, paddr=None, fill=[], **_):
+    def __init__(self, name, size=16384, paddr=None, fill=[], **_):
         super(Frame, self).__init__(name)
         self.size = size
         self.paddr = paddr

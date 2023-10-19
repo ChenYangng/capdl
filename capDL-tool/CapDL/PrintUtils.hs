@@ -379,6 +379,7 @@ prettyArch IA32  = text "ia32"
 prettyArch X86_64 = text "x86_64"
 prettyArch AARCH64 = text "aarch64"
 prettyArch RISCV = text "riscv"
+prettyArch LOONGARCH = text "loongarch"
 
 -- | Helper for sorting function.
 -- Return results in 'Left', so they sort before non-results.

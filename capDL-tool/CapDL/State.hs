@@ -485,6 +485,7 @@ validTCBSlotCap arch slot cap
                 X86_64 -> is _PML4Cap cap
                 AARCH64 -> is _PGDCap cap || is _PUDCap cap
                 RISCV -> is _PTCap cap
+                LOONGARCH -> is _PTCap cap
     | slot == tcbReplySlot = is _MasterReplyCap cap
     | slot == tcbCallerSlot = is _ReplyCap cap
     | slot == tcbIPCBufferSlot = is _FrameCap cap
@@ -500,6 +501,7 @@ validObjCap _ (CNode _ 0) slot cap = slot == 0 && is _NotificationCap cap -- FIX
 validObjCap _ (CNode {}) _ _ = True
 validObjCap _ (ASIDPool {}) _ cap = is _PDCap cap
 validObjCap RISCV (PT {}) _ cap = is _FrameCap cap || is _PTCap cap
+validObjCap LOONGARCH (PT {}) _ cap = is _FrameCap cap || is _PTCap cap
 validObjCap _ (PT {}) _ cap = is _FrameCap cap
 validObjCap _ (PD {}) _ cap = is _FrameCap cap || is _PTCap cap
 validObjCap _ (PDPT {}) _ cap = is _FrameCap cap || is _PDCap cap

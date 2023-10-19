@@ -84,7 +84,7 @@ typedef enum {
     CDL_SIDCap,
     CDL_CBCap,
 #endif
-#if defined(CONFIG_ARM_HYPERVISOR_SUPPORT) || defined(CONFIG_VTX)
+#if defined(CONFIG_ARM_HYPERVISOR_SUPPORT) || defined(CONFIG_VTX) || defined(CONFIG_ARCH_LOONGARCH)
     CDL_VCPUCap,
 #endif
     CDL_SCCap,
@@ -217,6 +217,14 @@ typedef enum {
      */
     CDL_PT_ROOT_ALIAS = seL4_ObjectTypeCount + 10,
 #endif
+#ifdef CONFIG_ARCH_LOONGARCH
+    CDL_Frame         = seL4_LOONGARCH_16K_Page,
+    CDL_PT            = seL4_LOONGARCH_PageTableObject,
+    CDL_PT_ROOT_ALIAS = seL4_ObjectTypeCount + 10,
+#endif
+#ifdef CONFIG_LOONGARCH_HYPERVISOR_SUPPORT
+    CDL_VCPU          = seL4_LOONGARCH_VCPUObject,
+#endif
 } CDL_ObjectType;
 
 #ifdef CONFIG_ARCH_AARCH64
@@ -253,6 +261,17 @@ typedef enum {
 #define CDL_PT_LEVEL_3_MAP       seL4_RISCV_PageTable_Map
 #define CDL_PT_LEVEL_3_IndexBits seL4_PageTableIndexBits
 #define CDL_PT_NUM_LEVELS CONFIG_PT_LEVELS
+#elif CONFIG_ARCH_LOONGARCH
+#define CDL_TOP_LEVEL_PD         CDL_PT_ROOT_ALIAS
+#define CDL_PT_LEVEL_0_MAP       seL4_LOONGARCH_PageTable_Map
+#define CDL_PT_LEVEL_0_IndexBits seL4_PageTableIndexBits
+#define CDL_PT_LEVEL_1_MAP       seL4_LOONGARCH_PageTable_Map
+#define CDL_PT_LEVEL_1_IndexBits seL4_PageTableIndexBits
+#define CDL_PT_LEVEL_2_MAP       seL4_LOONGARCH_PageTable_Map
+#define CDL_PT_LEVEL_2_IndexBits seL4_PageTableIndexBits
+#define CDL_PT_LEVEL_3_MAP       seL4_LOONGARCH_PageTable_Map
+#define CDL_PT_LEVEL_3_IndexBits seL4_PageTableIndexBits
+#define CDL_PT_NUM_LEVELS        CONFIG_PT_LEVELS
 #else
 #define CDL_TOP_LEVEL_PD         CDL_PD
 #define CDL_PT_NUM_LEVELS 2
@@ -410,7 +429,7 @@ typedef struct {
 #define CDL_TCB_SC_Slot             6
 #define CDL_TCB_TemporalFaultEP_Slot   7
 
-#if defined(CONFIG_ARM_HYPERVISOR_SUPPORT) || defined(CONFIG_VTX)
+#if defined(CONFIG_ARM_HYPERVISOR_SUPPORT) || defined(CONFIG_VTX) || defined(CONFIG_ARCH_LOONGARCH)
 #define CDL_TCB_VCPU_SLOT           8
 #endif
 

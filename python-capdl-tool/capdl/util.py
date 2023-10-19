@@ -19,8 +19,10 @@ from six.moves import range
 from .Object import ObjectType, PageTable, PageDirectory, PML4, PDPT, PGD, PUD, get_object_size
 
 # Size of a frame and page (applies to all architectures)
-FRAME_SIZE = 4096  # bytes
-PAGE_SIZE = 4096  # bytes
+# FRAME_SIZE = 4096  # bytes
+# PAGE_SIZE = 4096  # bytes
+FRAME_SIZE = 16384  # bytes
+PAGE_SIZE = 16384  # bytes
 
 SIZE_64K = 64 * 1024
 SIZE_1M = 1024 * 1024
@@ -219,7 +221,6 @@ class RISCV64Arch(Arch):
     def ipc_buffer_size(self):
         return 1024
 
-
 class RISCV32Arch(Arch):
     def capdl_name(self):
         return "riscv"
@@ -238,6 +239,26 @@ class RISCV32Arch(Arch):
     def ipc_buffer_size(self):
         return 512
 
+class LOONGARCH64Arch(Arch):
+    def capdl_name(self):
+        return "loongarch"
+
+    def levels(self):
+        return [
+            Level(2 ** 47, [ObjectType.seL4_HugePageObject],
+                  ObjectType.seL4_PageTableObject, PageTable, "pt"),
+            Level(2 ** 36, [ObjectType.seL4_LargePageObject],
+                  ObjectType.seL4_PageTableObject, PageTable, "pt"),
+            Level(2 ** 25, [ObjectType.seL4_SmallPageObject],
+                  ObjectType.seL4_PageTableObject, PageTable, "pt"),
+        ]
+
+    def word_size_bits(self):
+        return 64
+
+    def ipc_buffer_size(self):
+        return 1024
+
 
 # Support for ARMv6 has been removed from seL4 in early 2022. However, support
 # for "arm11" is kept here, because this name is used in the CapDL specification
@@ -246,13 +267,14 @@ class RISCV32Arch(Arch):
 # the name there isn't causing any issues.
 CAPDL_SUPPORTED_ARCHITECTURES = {
     # <name>:  [arch_obj_ctor, <alias_list>]
-    'aarch32': [lambda: ARM32Arch(),         ['arm', 'arm11']],
-    'arm_hyp': [lambda: ARM32Arch(hyp=True), []],
-    'aarch64': [lambda: AARCH64Arch(),       []],
-    'ia32':    [lambda: IA32Arch(),          ['x86']],
-    'x86_64':  [lambda: X64Arch(),           []],
-    'riscv32': [lambda: RISCV32Arch(),       []],
-    'riscv64': [lambda: RISCV64Arch(),       []],
+    'aarch32': [lambda: ARM32Arch(),           ['arm', 'arm11']],
+    'arm_hyp': [lambda: ARM32Arch(hyp=True),   []],
+    'aarch64': [lambda: AARCH64Arch(),         []],
+    'ia32':    [lambda: IA32Arch(),            ['x86']],
+    'x86_64':  [lambda: X64Arch(),             []],
+    'riscv32': [lambda: RISCV32Arch(),         []],
+    'riscv64': [lambda: RISCV64Arch(),         []],
+    'loongarch64': [lambda: LOONGARCH64Arch(), []],
 }
 
 
